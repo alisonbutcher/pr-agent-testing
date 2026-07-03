@@ -1,3 +1,7 @@
+[config]
+model = "claude-sonnet-5"
+fallback_models = ["claude-haiku-4-5-20251001"]
+
 [pr_reviewer]
 # Require the agent to run automatically when a PR is opened
 require_score_review = true
