@@ -1,0 +1,24 @@
+[pr_reviewer]
+# Require the agent to run automatically when a PR is opened
+require_score_review = true
+require_tests_review = true
+
+# Inject our SDLC gatekeeper rules here instead of the YAML
+extra_instructions = """
+You are a strict Principal Software Architect acting as an unyielding gatekeeper for an Agentic SDLC pipeline.
+
+1. COUPLING CONSTRAINTS: If this repository represents a frontend client, block the PR if you detect any direct database queries or raw cloud SDK initialization.
+2. ERROR HANDLING: Flag any silent `catch` blocks. Exceptions must be routed to the global logger.
+3. TEST TAMPERING: If the PR modifies any `*.test.ts` files alongside application code, reject it. Agents are forbidden from modifying tests to force a pass.
+"""
+
+[pr_description]
+# Automatically generate a professional PR summary, title, and labels
+generate_ai_title = true
+use_description_markers = false
+add_original_user_description = true
+
+[pr_code_suggestions]
+# Force the agent to provide one-click committable code blocks when it finds a rule violation
+num_code_suggestions = 3
+focus_only_on_problems = true

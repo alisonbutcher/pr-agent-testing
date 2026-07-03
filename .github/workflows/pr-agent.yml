@@ -1,0 +1,40 @@
+name: Agentic Quality & Security Gate
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+  issue_comment:
+    types: [created, edited]
+
+permissions:
+  pull-requests: write
+  issues: write
+  contents: write
+
+jobs:
+  pr-agent-reviewer:
+    runs-on: ubuntu-latest
+    name: Autonomous Code Review
+    if: ${{ github.event.sender.type != 'Bot' }}
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 
+
+      # 1. Automatically write the PR Description and Changelog
+      - name: PR Agent - Describe
+        uses: Codium-ai/pr-agent@main
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          github_action_config.auto_describe: true
+
+      # 2. Execute the strict architectural review using .pr_agent.toml rules
+      - name: PR Agent - Review
+        uses: Codium-ai/pr-agent@main
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          github_action_config.auto_review: true
