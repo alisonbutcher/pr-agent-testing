@@ -1,5 +1,5 @@
 [config]
-model = "anthropic/claude-sonnet-5"
+model = "anthropic/claude-sonnet-4-6"
 custom_model_max_tokens = 200000
 fallback_models = ["anthropic/claude-haiku-4-5-20251001"]
 
