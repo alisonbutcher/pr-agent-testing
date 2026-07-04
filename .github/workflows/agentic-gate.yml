@@ -28,8 +28,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ANTHROPIC.KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          config.model: "anthropic/claude-sonnet-4-6"
-          config.fallback_models: '["anthropic/claude-haiku-4-5-20251001"]'
+          config.model: ${{ vars.PR_AGENT_MODEL }}
+          config.fallback_models: '["${{ vars.PR_AGENT_FALLBACK_MODEL }}"]'
           github_action_config.auto_review: "true"
           github_action_config.auto_describe: "true"
           github_action_config.auto_improve: "true"
@@ -55,9 +55,11 @@ jobs:
 
           echo "PR-Agent score: ${SCORE}/100"
 
-          if [ "$SCORE" -lt 60 ]; then
-            echo "❌ Quality gate FAILED: score ${SCORE}/100 is below minimum (60/100)"
+          MIN_SCORE=${{ vars.QUALITY_GATE_MIN_SCORE }}
+
+          if [ "$SCORE" -lt "$MIN_SCORE" ]; then
+            echo "❌ Quality gate FAILED: score ${SCORE}/100 is below minimum (${MIN_SCORE}/100)"
             exit 1
           fi
 
-          echo "✅ Quality gate PASSED: score ${SCORE}/100"
+          echo "✅ Quality gate PASSED: score ${SCORE}/100 (minimum: ${MIN_SCORE}/100)"
