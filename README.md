@@ -6,39 +6,27 @@ A reusable GitHub repository template that enforces code quality and security st
 
 ## How it works
 
+```mermaid
+flowchart TD
+    START([Start]) --> A
+
+    A["1. Code Gen Agent\n─────────────────\nWrites code on a feature branch\nusing conventional commits"]
+
+    A --> B["2. Submit / Update PR\n─────────────────\ngit push\ngh pr create"]
+
+    B --> C["3. Agentic Quality & Security Gate\n─────────────────\nPR-Agent reviews against 14 rules\nProduces a score out of 100\nCodeQL SAST scan runs in parallel"]
+
+    C -->|"Score < 60\nor violations found"| D["4. Agent Self-Corrects\n─────────────────\nReads PR-Agent review comment\nFixes flagged violations\nPushes updated commits"]
+
+    D --> C
+
+    C -->|"Score ≥ 60\nno blocking violations"| E["5. HITL Gate\n─────────────────\nHuman reviews PR-Agent summary\nApproves or requests changes"]
+
+    E -->|Approved| F([Merged to main])
+    E -->|Changes requested| A
 ```
-Agent writes code
-       │
-       ▼
-git checkout -b feat/my-change
-git commit -m "feat: ..."
-gh pr create
-       │
-       ▼
-┌─────────────────────────────────┐
-│   Agentic Quality & Security Gate│
-│                                 │
-│  1. PR-Agent AI review runs     │
-│     • Describes the PR          │
-│     • Reviews against 14 rules  │
-│     • Suggests improvements     │
-│     • Produces a score /100     │
-│                                 │
-│  2. Quality gate checks score   │
-│     • Score >= 60  passes       │
-│     • Score < 60   fails        │
-│                                 │
-│  3. CodeQL SAST scan runs       │
-└─────────────────────────────────┘
-       │
-       ▼
-  Gate failed?
-  Read PR-Agent comment → fix violations → push → gate re-runs
-       │
-       ▼
-  Gate passed?
-  Human reviews and merges
-```
+
+The self-correction loop between steps 3 and 4 is driven by `CLAUDE.md` — the agent reads PR-Agent's review comment directly from the PR and iterates without human involvement until the gate passes.
 
 ---
 
