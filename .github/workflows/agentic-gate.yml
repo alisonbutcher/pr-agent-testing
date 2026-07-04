@@ -23,6 +23,17 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Verify Anthropic API Key
+        run: |
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" https://api.anthropic.com/v1/models \
+            -H "x-api-key: ${{ secrets.ANTHROPIC_API_KEY }}" \
+            -H "anthropic-version: 2023-06-01")
+          if [ "$RESPONSE" != "200" ]; then
+            echo "ERROR: ANTHROPIC_API_KEY is invalid or missing (HTTP $RESPONSE)"
+            exit 1
+          fi
+          echo "API key verified OK"
+
       # 1. Automatically write the PR Description and Changelog
       - name: PR Agent - Describe
         uses: Codium-ai/pr-agent@main
