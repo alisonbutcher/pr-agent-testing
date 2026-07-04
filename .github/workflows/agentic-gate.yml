@@ -32,3 +32,33 @@ jobs:
           config.fallback_models: '["anthropic/claude-haiku-4-5-20251001"]'
           github_action_config.auto_review: "true"
           github_action_config.auto_describe: "true"
+
+      - name: Enforce Quality Gate
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUM=${{ github.event.pull_request.number }}
+          REPO=${{ github.repository }}
+
+          # Wait briefly to ensure PR-Agent has posted its comment
+          sleep 5
+
+          # Extract score from the PR-Agent review comment
+          SCORE=$(gh api repos/${REPO}/issues/${PR_NUM}/comments \
+            --jq '[.[] | select(.user.login == "github-actions[bot]") | select(.body | contains("PR Reviewer Guide")) | .body] | last // ""' \
+            | grep -oP '(?<=Score</strong>: )\d+' || true)
+
+          if [ -z "$SCORE" ]; then
+            echo "No PR-Agent score found — review may have been skipped."
+            exit 0
+          fi
+
+          echo "PR-Agent score: ${SCORE}/100"
+
+          if [ "$SCORE" -lt 60 ]; then
+            echo "❌ Quality gate FAILED: score ${SCORE}/100 is below minimum (60/100)"
+            exit 1
+          fi
+
+          echo "✅ Quality gate PASSED: score ${SCORE}/100"
