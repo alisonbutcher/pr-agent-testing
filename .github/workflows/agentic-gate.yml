@@ -23,16 +23,12 @@ jobs:
         with:
           fetch-depth: 0
 
-      # 1. Automatically write the PR Description and Changelog
-      - name: PR Agent - Describe
+      - name: PR Agent
         uses: Codium-ai/pr-agent@main
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      # 2. Execute the strict architectural review using .pr_agent.toml rules
-      - name: PR Agent - Review
-        uses: Codium-ai/pr-agent@main
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ANTHROPIC.KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          config.model: "anthropic/claude-sonnet-4-6"
+          config.fallback_models: '["anthropic/claude-haiku-4-5-20251001"]'
+          github_action_config.auto_review: "true"
+          github_action_config.auto_describe: "true"
