@@ -1,0 +1,13 @@
+# Copy this file to terraform.tfvars and fill in the values.
+# Never commit terraform.tfvars — it contains secrets.
+
+github_token           = "ghp_..."         # GitHub PAT: repo + admin:repo_hook + read:org
+github_owner           = "your-username"
+repository_name        = "your-repo-name"
+repository_description = "Agentic SDLC pipeline"
+anthropic_api_key      = "sk-ant-api03-..."
+
+# Optional — defaults shown
+# quality_gate_min_score  = 60
+# pr_agent_model          = "anthropic/claude-sonnet-4-6"
+# pr_agent_fallback_model = "anthropic/claude-haiku-4-5-20251001"
