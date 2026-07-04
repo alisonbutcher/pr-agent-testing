@@ -12,7 +12,32 @@ This repository uses an agentic quality and security gate. All code submitted by
 
 2. **Never push directly to `main`.** Branch protection will reject it. Always work on a feature branch.
 
-3. **Commit regularly** with clear messages describing why, not what.
+3. **Commit using conventional commit format** — every commit message must follow this pattern:
+
+   ```
+   <type>: <short description>
+   ```
+
+   | Type | When to use |
+   |------|------------|
+   | `feat:` | Adding new functionality |
+   | `fix:` | Correcting a bug |
+   | `chore:` | Tooling, config, dependencies, maintenance |
+   | `docs:` | Documentation only |
+   | `refactor:` | Code restructuring with no behaviour change |
+   | `test:` | Adding or updating tests |
+   | `perf:` | Performance improvement |
+   | `ci:` | CI/CD workflow changes |
+
+   Examples:
+   ```
+   feat: add user authentication middleware
+   fix: prevent null pointer in payment service
+   chore: update eslint to v9
+   refactor: extract validation logic into shared util
+   ```
+
+   PR titles must follow the same format. The PR-Agent will flag titles that do not.
 
 4. **Open a PR** when the work is ready:
    ```
