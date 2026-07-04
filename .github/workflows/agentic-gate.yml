@@ -16,6 +16,8 @@ jobs:
     runs-on: ubuntu-latest
     name: Autonomous Code Review
     if: ${{ github.event.sender.type != 'Bot' }}
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
     steps:
       - name: Checkout Code
@@ -42,12 +44,10 @@ jobs:
       - name: PR Agent - Describe
         uses: Codium-ai/pr-agent@main
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # 2. Execute the strict architectural review using .pr_agent.toml rules
       - name: PR Agent - Review
         uses: Codium-ai/pr-agent@main
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
