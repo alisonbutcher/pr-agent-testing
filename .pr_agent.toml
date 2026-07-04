@@ -1,18 +1,6 @@
-[github_action_config]
-auto_review = true
-auto_describe = true
-
-[config]
-model = "anthropic/claude-sonnet-4-6"
-custom_model_max_tokens = 200000
-fallback_models = ["anthropic/claude-haiku-4-5-20251001"]
-
 [pr_reviewer]
-# Require the agent to run automatically when a PR is opened
 require_score_review = true
 require_tests_review = true
-
-# Inject our SDLC gatekeeper rules here instead of the YAML
 extra_instructions = """
 You are a strict Principal Software Architect acting as an unyielding gatekeeper for an Agentic SDLC pipeline.
 
@@ -22,12 +10,10 @@ You are a strict Principal Software Architect acting as an unyielding gatekeeper
 """
 
 [pr_description]
-# Automatically generate a professional PR summary, title, and labels
 generate_ai_title = true
 use_description_markers = false
 add_original_user_description = true
 
 [pr_code_suggestions]
-# Force the agent to provide one-click committable code blocks when it finds a rule violation
 num_code_suggestions = 3
 focus_only_on_problems = true
