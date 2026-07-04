@@ -1,0 +1,123 @@
+name: Auto-Remediation
+
+on:
+  check_run:
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  remediate:
+    runs-on: ubuntu-latest
+    name: Auto-fix quality gate violations
+    if: |
+      github.event.check_run.name == 'Autonomous Code Review' &&
+      github.event.check_run.conclusion == 'failure' &&
+      github.event.check_run.pull_requests[0] != null
+
+    steps:
+      - name: Guard against remediation loops
+        id: guard
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUM=${{ github.event.check_run.pull_requests[0].number }}
+
+          # Count how many consecutive bot commits are at the tip of the branch.
+          # If >= 3, stop — the violations likely require human intervention.
+          BOT_COMMITS=$(gh api repos/${{ github.repository }}/pulls/${PR_NUM}/commits \
+            --jq '[.[] | select(.commit.author.name == "github-actions[bot]")] | length')
+
+          LAST_AUTHOR=$(gh api repos/${{ github.repository }}/pulls/${PR_NUM}/commits \
+            --jq '.[-1].commit.author.name')
+
+          echo "last_author=$LAST_AUTHOR" >> $GITHUB_OUTPUT
+          echo "bot_commits=$BOT_COMMITS" >> $GITHUB_OUTPUT
+
+          if [[ "$LAST_AUTHOR" == "github-actions[bot]" && "$BOT_COMMITS" -ge 3 ]]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "Remediation attempted 3 times without passing — escalating to human."
+          elif [[ "$LAST_AUTHOR" == "github-actions[bot]" ]]; then
+            echo "skip=false" >> $GITHUB_OUTPUT
+            echo "Previous bot attempt did not pass — retrying (attempt $((BOT_COMMITS + 1))/3)."
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+            echo "First remediation attempt."
+          fi
+
+      - name: Comment on PR if escalating
+        if: steps.guard.outputs.skip == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUM=${{ github.event.check_run.pull_requests[0].number }}
+          gh pr comment $PR_NUM --body "**Auto-remediation stopped after 3 attempts.**
+
+          The quality gate is still failing after 3 automated fix attempts. The remaining violations likely require human judgement to resolve.
+
+          Please review the PR-Agent feedback and fix the issues manually."
+
+      - name: Checkout PR branch
+        if: steps.guard.outputs.skip == 'false'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.check_run.pull_requests[0].head.ref }}
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Fetch PR-Agent review comment
+        if: steps.guard.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUM=${{ github.event.check_run.pull_requests[0].number }}
+          gh api repos/${{ github.repository }}/issues/${PR_NUM}/comments \
+            --jq '[.[] | select(.user.login == "github-actions[bot]") | select(.body | contains("PR Reviewer Guide")) | .body] | last // ""' \
+            > /tmp/review-comment.txt
+          echo "Fetched review comment ($(wc -c < /tmp/review-comment.txt) bytes)"
+
+      - name: Install Claude Code
+        if: steps.guard.outputs.skip == 'false'
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Auto-remediate violations
+        if: steps.guard.outputs.skip == 'false'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          cat > /tmp/remediation-prompt.txt << 'PROMPT'
+          You are an AI agent in an automated SDLC pipeline. The quality gate has failed on this pull request. Your task is to fix every violation listed in the PR-Agent review feedback below so the gate passes on the next run.
+
+          Rules you must follow:
+          - Fix every flagged violation
+          - Do NOT modify any *.test.ts or *.spec.ts files under any circumstances
+          - Do NOT leave console.log, console.warn, or console.error in production code
+          - Do NOT use the `any` type in TypeScript
+          - Do NOT hardcode URLs, credentials, or API keys
+          - Do NOT introduce new violations while fixing existing ones
+          - Read each affected file before editing it
+          - Make the minimal change needed to fix each violation
+
+          PR-Agent review feedback:
+          PROMPT
+
+          cat /tmp/review-comment.txt >> /tmp/remediation-prompt.txt
+
+          claude --dangerously-skip-permissions -p "$(cat /tmp/remediation-prompt.txt)"
+
+      - name: Commit and push fixes
+        if: steps.guard.outputs.skip == 'false'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          if git diff --quiet && git diff --staged --quiet; then
+            echo "No file changes detected — violations may require manual intervention."
+          else
+            git add -A
+            git commit -m "fix: auto-remediate quality gate violations [bot]"
+            git push
+            echo "Fixes pushed — quality gate will re-run automatically."
+          fi

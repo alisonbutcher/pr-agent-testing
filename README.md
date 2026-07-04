@@ -16,7 +16,7 @@ flowchart TD
 
     B --> C["3. Agentic Quality & Security Gate\n─────────────────\nPR-Agent reviews against 14 rules\nProduces a score out of 100\nCodeQL SAST scan runs in parallel"]
 
-    C -->|"Score < 60\nor violations found"| D["4. Agent Self-Corrects\n─────────────────\nReads PR-Agent review comment\nFixes flagged violations\nPushes updated commits"]
+    C -->|"Score < 60\nor violations found"| D["4. Auto-Remediation\n─────────────────\nClaude Code reads review comment\nFixes violations automatically\nPushes fixes · gate re-runs\nMax 3 attempts before escalation"]
 
     D --> C
 
@@ -26,7 +26,7 @@ flowchart TD
     E -->|Changes requested| A
 ```
 
-The self-correction loop between steps 3 and 4 is driven by `CLAUDE.md` — the agent reads PR-Agent's review comment directly from the PR and iterates without human involvement until the gate passes.
+The automated loop between steps 3 and 4 runs entirely without human involvement. When the quality gate fails, `auto-remediate.yml` triggers automatically, runs Claude Code against the PR-Agent feedback, pushes fixes, and the gate re-runs. After 3 failed attempts it escalates with a comment on the PR. The human at step 5 only sees PRs the automation has already signed off on.
 
 ---
 
@@ -119,6 +119,31 @@ Rules are defined in `.pr_agent.toml`. Edit `extra_instructions` to add, remove,
 
 ---
 
+## Auto-remediation
+
+When the quality gate fails, `auto-remediate.yml` triggers automatically:
+
+1. Fetches the PR-Agent review comment from the PR
+2. Runs Claude Code non-interactively with the review feedback as context
+3. Claude Code reads the flagged files, fixes every violation, and pushes a new commit
+4. The quality gate re-runs on the new commit
+
+If the gate still fails after **3 automated attempts**, the workflow stops and posts a comment on the PR asking for human intervention. This prevents infinite loops where violations genuinely require judgement to resolve.
+
+The human reviewer at the HITL gate never sees a PR that has failed the automated checks — by the time it reaches them, the automation has already signed off.
+
+### What auto-remediation will and won't fix
+
+| Will fix | Won't fix |
+|----------|-----------|
+| Silent catch blocks | Architectural violations requiring structural refactors |
+| `console.log` in production code | Logic bugs that need domain understanding |
+| `any` types in TypeScript | Violations in test files (forbidden by the rules) |
+| Hardcoded values → env var references | Issues requiring credentials or environment knowledge |
+| Missing error logging | Violations that conflict with each other |
+
+---
+
 ## Gatekeeper rules
 
 PR-Agent reviews every PR against 14 rules. Violations reduce the score; enough violations fail the gate.
@@ -189,6 +214,7 @@ All commits and PR titles must follow [Conventional Commits](https://www.convent
 .github/
   workflows/
     agentic-gate.yml        # PR-Agent quality gate + score enforcement
+    auto-remediate.yml      # Triggered on gate failure — Claude Code fixes violations
     codeql.yml              # CodeQL SAST — runs on PRs and weekly
   dependabot.yml            # Weekly dependency updates (npm + Actions)
   pull_request_template.md  # Checklist shown when opening a PR
