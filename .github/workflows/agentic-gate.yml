@@ -16,8 +16,6 @@ jobs:
     runs-on: ubuntu-latest
     name: Autonomous Code Review
     if: ${{ github.event.sender.type != 'Bot' }}
-    env:
-      ANTHROPIC.KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
     steps:
       - name: Checkout Code
@@ -25,26 +23,12 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Verify Anthropic API Key
-        run: |
-          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" https://api.anthropic.com/v1/models \
-            -H "x-api-key: ${{ secrets.ANTHROPIC_API_KEY }}" \
-            -H "anthropic-version: 2023-06-01")
-          echo "API response code: $RESPONSE"
-          if [ "$RESPONSE" != "200" ]; then
-            echo "ERROR: ANTHROPIC_API_KEY is invalid or missing"
-            exit 1
-          fi
-          echo "API key verified OK"
-
-      # 1. Automatically write the PR Description and Changelog
-      - name: PR Agent - Describe
+      - name: PR Agent
         uses: Codium-ai/pr-agent@main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      # 2. Execute the strict architectural review using .pr_agent.toml rules
-      - name: PR Agent - Review
-        uses: Codium-ai/pr-agent@main
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ANTHROPIC.KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          config.model: "anthropic/claude-sonnet-4-6"
+          config.fallback_models: '["anthropic/claude-haiku-4-5-20251001"]'
+          github_action_config.auto_review: "true"
+          github_action_config.auto_describe: "true"
