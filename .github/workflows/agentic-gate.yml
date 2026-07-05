@@ -15,7 +15,9 @@ jobs:
   pr-agent-reviewer:
     runs-on: ubuntu-latest
     name: Autonomous Code Review
-    if: ${{ github.event.sender.type != 'Bot' }}
+    if: |
+      github.event.sender.type != 'Bot' &&
+      (github.event_name != 'issue_comment' || startsWith(github.event.comment.body, '/'))
 
     steps:
       - name: Checkout Code
