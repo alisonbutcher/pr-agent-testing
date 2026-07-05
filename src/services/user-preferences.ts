@@ -1,5 +1,3 @@
-import { logger } from '../utils/logger';
-
 interface UserPreferences {
   theme: string;
   language: string;
