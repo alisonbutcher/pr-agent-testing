@@ -1,6 +1,22 @@
-# Agentic SDLC Pipeline
+# Agentic SDLC Pipeline Template
 
-A reusable GitHub repository template that enforces code quality and security standards on pull requests submitted by AI agents. It combines PR-Agent AI review, a numeric quality gate, CodeQL SAST scanning, Dependabot dependency management, and branch protection — all bootstrapped via Terraform with no manual click-ops.
+A GitHub repository template that enforces code quality and security standards on pull requests submitted by AI agents. Clone it, run `terraform apply`, and you have a fully configured pipeline — no click-ops required.
+
+---
+
+## What this template gives you
+
+| Component | What it does |
+|-----------|-------------|
+| **PR-Agent quality gate** | AI code review on every PR, scored /100. Gate fails if score < 60. |
+| **Auto-remediation** | When the gate fails, Claude Code fixes violations automatically and pushes. Up to 3 attempts before escalating. |
+| **CodeQL SAST** | Static analysis on every PR and weekly. Results in the Security tab. |
+| **Dependabot** | Weekly PRs for outdated npm packages and GitHub Actions. Security updates fire immediately on CVE discovery. |
+| **Secret scanning** | Blocks commits containing detected secrets. |
+| **Branch protection** | Requires PR before merging. Requires conversation resolution. |
+| **14 gatekeeper rules** | 6 quality rules + 8 OWASP security rules — tuned for AI agent failure modes. |
+| **CLAUDE.md** | Claude Code reads this at session start — tells the agent the full workflow, commit format, and all rules. |
+| **Terraform IaC** | Configures all GitHub settings from a single `terraform apply`. |
 
 ---
 
@@ -26,27 +42,33 @@ flowchart TD
     E -->|Changes requested| A
 ```
 
-The automated loop between steps 3 and 4 runs entirely without human involvement. When the quality gate fails, `auto-remediate.yml` triggers automatically, runs Claude Code against the PR-Agent feedback, pushes fixes, and the gate re-runs. After 3 failed attempts it escalates with a comment on the PR. The human at step 5 only sees PRs the automation has already signed off on.
+The human at step 5 only sees PRs the automation has already signed off on.
 
 ---
 
-## Bootstrapping a new project
+## Getting started
 
 ### Prerequisites
 
 - [Terraform](https://developer.hashicorp.com/terraform/install) >= 1.5
-- [GitHub CLI](https://cli.github.com/) authenticated (`gh auth login`)
+- [GitHub CLI](https://cli.github.com/) (`gh auth login`)
 - A GitHub personal access token with `repo`, `admin:repo_hook`, and `read:org` scopes
-- An Anthropic API key
+- An [Anthropic API key](https://console.anthropic.com/)
 
 ### Steps
 
-```bash
-# 1. Clone this repo as the starting point for your new project
-git clone https://github.com/alisonbutcher/pr-agent-testing my-new-project
-cd my-new-project
+**1. Create a new repo from this template**
 
-# 2. Configure Terraform variables
+Click **Use this template** on GitHub, or clone directly:
+
+```bash
+git clone https://github.com/alisonbutcher/pr-agent-testing my-project
+cd my-project
+```
+
+**2. Configure Terraform**
+
+```bash
 cd terraform
 cp terraform.tfvars.example terraform.tfvars
 ```
@@ -56,31 +78,27 @@ Edit `terraform.tfvars`:
 ```hcl
 github_token           = "ghp_..."
 github_owner           = "your-username-or-org"
-repository_name        = "my-new-project"
-repository_description = "Short description of your project"
+repository_name        = "my-project"
+repository_description = "Short description"
 anthropic_api_key      = "sk-ant-api03-..."
 ```
 
+**3. Apply**
+
 ```bash
-# 3. Apply — creates the repo and configures all settings
 terraform init
 terraform apply
+```
 
-# 4. Push the repo files to the newly created GitHub repo
+**4. Push to your new repo**
+
+```bash
 cd ..
-git remote set-url origin git@github.com:<your-owner>/my-new-project.git
+git remote set-url origin git@github.com:<your-owner>/my-project.git
 git push -u origin main
 ```
 
-That's it. The full pipeline is live.
-
-> **Using an existing repo instead of Terraform?** Set the Actions variables manually:
-> ```bash
-> gh variable set QUALITY_GATE_MIN_SCORE --body "60" --repo <owner>/<repo>
-> gh variable set PR_AGENT_MODEL --body "anthropic/claude-sonnet-4-6" --repo <owner>/<repo>
-> gh variable set PR_AGENT_FALLBACK_MODEL --body "anthropic/claude-haiku-4-5-20251001" --repo <owner>/<repo>
-> ```
-> If these are not set, the workflow falls back to hardcoded defaults — but it's better to have them explicit.
+The full pipeline is live. Open a PR to see it in action.
 
 ### What Terraform configures
 
@@ -89,8 +107,7 @@ That's it. The full pipeline is live.
 | Repository visibility | Public |
 | Merge strategy | Squash only, delete branch on merge |
 | Dependabot vulnerability alerts | Enabled |
-| Secret scanning | Enabled |
-| Push protection | Enabled |
+| Secret scanning + push protection | Enabled |
 | Branch ruleset | Requires PR before merging to main |
 | Conversation resolution | Required before merge |
 | `ANTHROPIC_API_KEY` Actions secret | Set from `terraform.tfvars` |
@@ -104,9 +121,10 @@ That's it. The full pipeline is live.
 
 ### Adjusting the quality gate threshold
 
-The minimum passing score defaults to 60/100. In practice, minor violations (e.g. a couple of `console.log` calls) may still score above 60 — if you want stricter enforcement, raise the threshold. To change it, update `terraform.tfvars` and re-apply:
+Defaults to 60/100. Minor violations (a couple of `console.log` calls) may still score above 60 — raise the threshold if you want stricter enforcement.
 
 ```hcl
+# terraform.tfvars
 quality_gate_min_score = 75
 ```
 
@@ -123,79 +141,69 @@ pr_agent_fallback_model = "anthropic/claude-haiku-4-5-20251001"
 
 ### Editing gatekeeper rules
 
-Rules are defined in `.pr_agent.toml`. Edit `extra_instructions` to add, remove, or reword rules, then commit and merge to `main` — PR-Agent always reads config from the base branch.
-
----
-
-## Auto-remediation
-
-When the quality gate fails, `auto-remediate.yml` triggers automatically:
-
-1. Fetches the PR-Agent review comment from the PR
-2. Runs Claude Code non-interactively with the review feedback as context
-3. Claude Code reads the flagged files, fixes every violation, and pushes a new commit
-4. The quality gate re-runs on the new commit
-
-If the gate still fails after **3 automated attempts**, the workflow stops and posts a comment on the PR asking for human intervention. This prevents infinite loops where violations genuinely require judgement to resolve.
-
-The human reviewer at the HITL gate never sees a PR that has failed the automated checks — by the time it reaches them, the automation has already signed off.
-
-### What auto-remediation will and won't fix
-
-| Will fix | Won't fix |
-|----------|-----------|
-| Silent catch blocks | Architectural violations requiring structural refactors |
-| `console.log` in production code | Logic bugs that need domain understanding |
-| `any` types in TypeScript | Violations in test files (forbidden by the rules) |
-| Hardcoded values → env var references | Issues requiring credentials or environment knowledge |
-| Missing error logging | Violations that conflict with each other |
+Rules are in `.pr_agent.toml`. Edit `extra_instructions`, commit, and merge to `main` — PR-Agent always reads config from the base branch.
 
 ---
 
 ## Gatekeeper rules
 
-PR-Agent reviews every PR against 14 rules. Violations reduce the score; enough violations fail the gate.
+### Quality
 
-### Quality rules
+| Rule | What triggers it |
+|------|-----------------|
+| Coupling | Direct DB queries or raw cloud SDK imports in frontend components |
+| Error handling | Silent `catch` blocks that swallow errors without logging |
+| Test tampering | Modifying `*.test.ts` files alongside application code |
+| Type safety | `any` types in TypeScript |
+| Debug artifacts | `console.log`, `console.warn`, or `console.error` in production code |
+| Hardcoded values | Hardcoded URLs, endpoints, or credentials |
 
-| Rule | Description |
-|------|-------------|
-| Coupling | No direct DB queries or raw cloud SDK imports in frontend components |
-| Error handling | No silent `catch` blocks — exceptions must be logged |
-| Test tampering | Agents may not modify `*.test.ts` files alongside application code |
-| Type safety | No `any` types in TypeScript |
-| Debug artifacts | No `console.log/warn/error` in production code |
-| Hardcoded values | No hardcoded URLs, endpoints, or credentials |
+### Security (OWASP Top 10)
 
-### Security rules (OWASP Top 10)
+| Rule | What triggers it |
+|------|-----------------|
+| Injection | Raw SQL string concatenation |
+| XSS | `dangerouslySetInnerHTML`, `innerHTML`, or `eval()` with user-controlled data |
+| Insecure deserialization | `JSON.parse` on external data without schema validation |
+| Dependency confusion | Imports of packages absent from `package.json` |
+| Path traversal | File system ops with user-supplied paths |
+| Secrets in code | Strings resembling API keys or tokens (`sk-`, `Bearer `, `password =`) |
+| Prototype pollution | Assignments to `__proto__` or `constructor.prototype` |
+| SSRF | HTTP calls where the URL is built from user-controlled input |
 
-| Rule | Description |
-|------|-------------|
-| Injection | No raw SQL string concatenation — use parameterised queries or an ORM |
-| XSS | No `dangerouslySetInnerHTML`, `innerHTML`, or `eval()` with user-controlled data |
-| Insecure deserialization | No `JSON.parse` on external data without schema validation |
-| Dependency confusion | No imports of packages absent from `package.json` |
-| Path traversal | No file system ops with user-supplied paths |
-| Secrets in code | No strings resembling API keys or tokens |
-| Prototype pollution | No assignments to `__proto__` or `constructor.prototype` |
-| SSRF | No HTTP calls where the URL is built from user input |
+---
+
+## Auto-remediation
+
+When the gate fails, `auto-remediate.yml` triggers automatically:
+
+1. Fetches the PR-Agent review comment
+2. Runs Claude Code non-interactively with the review feedback as context
+3. Claude Code reads the flagged files, fixes violations, and pushes a new commit
+4. The gate re-runs
+
+After **3 failed attempts** the workflow stops and posts a comment escalating to human review.
+
+### What auto-remediation handles well
+
+| Fixes reliably | Needs human |
+|----------------|-------------|
+| Silent catch blocks | Architectural violations |
+| `console.log` in production | Logic bugs requiring domain knowledge |
+| `any` types in TypeScript | Violations in test files (forbidden by rules) |
+| Hardcoded values → env vars | Conflicting requirements |
 
 ---
 
 ## Working with Claude Code
 
-This repo includes a `CLAUDE.md` file that Claude Code reads automatically at the start of every session. It tells the agent:
+`CLAUDE.md` is read automatically by Claude Code at the start of every session. It covers the full workflow, conventional commit format, and all 14 gatekeeper rules — so the agent knows what to avoid before writing a line of code.
 
-- Always work on a feature branch
-- Use conventional commit messages (`feat:`, `fix:`, `chore:`, etc.)
-- Open a PR and wait for the quality gate
-- If the gate fails, read the PR-Agent review comment and fix the violations before pushing again
-
-No extra prompting is needed — open a Claude Code session in this repo and it will follow the pipeline.
+No extra prompting needed. Open a Claude Code session in the repo and it follows the pipeline.
 
 ---
 
-## Commit and PR message format
+## Commit and PR format
 
 All commits and PR titles must follow [Conventional Commits](https://www.conventionalcommits.org/):
 
@@ -203,8 +211,8 @@ All commits and PR titles must follow [Conventional Commits](https://www.convent
 <type>: <short description>
 ```
 
-| Type | When to use |
-|------|------------|
+| Type | When |
+|------|------|
 | `feat:` | New functionality |
 | `fix:` | Bug fix |
 | `chore:` | Tooling, config, dependencies |
@@ -224,10 +232,10 @@ All commits and PR titles must follow [Conventional Commits](https://www.convent
     agentic-gate.yml        # PR-Agent quality gate + score enforcement
     auto-remediate.yml      # Triggered on gate failure — Claude Code fixes violations
     codeql.yml              # CodeQL SAST — runs on PRs and weekly
-  dependabot.yml            # Weekly dependency updates (npm + Actions)
+  dependabot.yml            # Weekly dependency + Actions updates
   pull_request_template.md  # Checklist shown when opening a PR
 .pr_agent.toml              # Gatekeeper rules and PR-Agent config
-CLAUDE.md                   # Agent operating manual (read by Claude Code)
+CLAUDE.md                   # Agent operating manual
 terraform/
   main.tf                   # Provider config
   variables.tf              # All configurable inputs
@@ -242,8 +250,7 @@ terraform/
 
 ## Security
 
-- Secrets are stored as GitHub Actions secrets, never in code
+- Secrets stored as GitHub Actions secrets, never in code
 - Push protection blocks commits containing detected secrets
-- CodeQL runs on every PR and on a weekly schedule
+- CodeQL runs on every PR and weekly — findings appear in the Security tab
 - Dependabot opens PRs for vulnerable dependencies automatically
-- All security findings from CodeQL appear in the GitHub Security tab
