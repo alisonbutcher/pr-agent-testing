@@ -74,6 +74,14 @@ git push -u origin main
 
 That's it. The full pipeline is live.
 
+> **Using an existing repo instead of Terraform?** Set the Actions variables manually:
+> ```bash
+> gh variable set QUALITY_GATE_MIN_SCORE --body "60" --repo <owner>/<repo>
+> gh variable set PR_AGENT_MODEL --body "anthropic/claude-sonnet-4-6" --repo <owner>/<repo>
+> gh variable set PR_AGENT_FALLBACK_MODEL --body "anthropic/claude-haiku-4-5-20251001" --repo <owner>/<repo>
+> ```
+> If these are not set, the workflow falls back to hardcoded defaults — but it's better to have them explicit.
+
 ### What Terraform configures
 
 | Setting | Value |
@@ -96,7 +104,7 @@ That's it. The full pipeline is live.
 
 ### Adjusting the quality gate threshold
 
-The minimum passing score defaults to 60/100. To change it, update `terraform.tfvars` and re-apply:
+The minimum passing score defaults to 60/100. In practice, minor violations (e.g. a couple of `console.log` calls) may still score above 60 — if you want stricter enforcement, raise the threshold. To change it, update `terraform.tfvars` and re-apply:
 
 ```hcl
 quality_gate_min_score = 75
